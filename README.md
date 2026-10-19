@@ -1,6 +1,16 @@
 # Quark Kill · QuarKill-Xposed
 
-> 基于 Xposed / LSPosed 的夸克浏览器界面精简模块。通过运行时 Hook 尝试隐藏部分首页入口、快捷按钮和推广元素，并提供实验性的网络请求过滤选项。
+> **让夸克回归简洁，减少不必要的干扰。** 基于 Xposed / LSPosed 的夸克浏览器界面精简模块，支持首页入口整理、AI 与快捷菜单精简，以及实验性的广告请求过滤。
+
+### ⭐ 如果项目对你有帮助，欢迎点个 Star！
+
+如果 Quark Kill 让你的夸克浏览器更简洁、使用起来更顺手，欢迎为仓库点亮一颗 **Star ⭐**。你的支持能让更多人发现项目，也会鼓励作者继续修复问题、维护功能和适配新版夸克。
+
+**👉 [前往 GitHub，给 Quark Kill 点个 Star ⭐](https://github.com/coderashuai/QuarKill-Xposed)**
+
+感谢每一位使用、反馈和支持项目的朋友！
+
+---
 
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](https://developer.android.com/)
 [![LSPosed](https://img.shields.io/badge/Framework-LSPosed-blue)](https://github.com/LSPosed/LSPosed)
