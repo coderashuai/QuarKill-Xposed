@@ -41,6 +41,7 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
     // Refresh at most once every 2 seconds so Settings changes reach Quark without
     // a process restart while avoiding a ContentProvider IPC on each UI draw.
     private static final java.util.concurrent.ConcurrentHashMap<String, Boolean> FLAGS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.concurrent.ConcurrentHashMap<String, Boolean> LAST_GOOD_FLAGS = new java.util.concurrent.ConcurrentHashMap<>();
     private static volatile long flagsReadAt;
     private static boolean flag(String key) {
         long now = android.os.SystemClock.elapsedRealtime();
@@ -54,14 +55,27 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
         }
         Boolean cached = FLAGS.get(key);
         if (cached != null) return cached;
-        android.app.Application app = null;
-        try { app = (android.app.Application) XposedHelpers.callStaticMethod(
-            XposedHelpers.findClass("android.app.ActivityThread", null), "currentApplication");
+        android.content.Context context = null;
+        try {
+            context = (android.content.Context) XposedHelpers.callStaticMethod(
+                XposedHelpers.findClass("android.app.ActivityThread", null), "currentApplication");
         } catch (Throwable ignored) {}
-        if (app == null) return false;
-        boolean value = LiteConfigProvider.read(app, key, false);
-        FLAGS.put(key, value);
-        return value;
+        if (context == null) {
+            try {
+                Object thread = XposedHelpers.callStaticMethod(
+                    XposedHelpers.findClass("android.app.ActivityThread", null), "currentActivityThread");
+                if (thread != null) context = (android.content.Context)
+                    XposedHelpers.callMethod(thread, "getSystemContext");
+            } catch (Throwable ignored) {}
+        }
+        Boolean value = LiteConfigProvider.readNullable(context, key);
+        if (value != null) {
+            FLAGS.put(key, value);
+            LAST_GOOD_FLAGS.put(key, value);
+            return value;
+        }
+        Boolean previous = LAST_GOOD_FLAGS.get(key);
+        return previous != null && previous;
     }
     private static void log(String s) {
         // Production logging: errors only. Avoid startup log I/O and repeated
@@ -69,7 +83,7 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
         if ((s.contains("failed") || s.contains("error") || s.contains("unavailable") ||
             (flag("diagnostic") && s.startsWith("blocked "))) &&
             LOGS.incrementAndGet() <= 40)
-            XposedBridge.log("QuarkLite/2.3.8 " + s);
+            XposedBridge.log("QuarkLite/2.3.9 " + s);
     }
 
     @Override public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
