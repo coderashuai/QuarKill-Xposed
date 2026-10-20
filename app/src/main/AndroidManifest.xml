@@ -1,4 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries><provider android:authorities="dev.quarklite.config" /></queries>
     <application android:label="Quark Kill" android:allowBackup="false">
         <activity android:name=".SettingsActivity" android:exported="true" android:label="Quark Kill">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
