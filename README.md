@@ -118,7 +118,7 @@ app/
   src/main/
     AndroidManifest.xml                 # 模块声明与设置页入口
     assets/xposed_init                  # Xposed Hook 入口
-    java/dev/quarklite/
+    java/dev/quark/kill/
       QuarkLiteHook.java                # 夸克界面与请求 Hook
       LiteConfigProvider.java           # 设置项跨进程读取
       SettingsActivity.java             # 设置界面与支持作者弹窗
@@ -127,7 +127,7 @@ build.gradle                            # Android Gradle Plugin 配置
 settings.gradle                         # 模块与依赖仓库配置
 ```
 
-模块自身包名为 `dev.quarklite`，目标夸克包名为 `com.quark.browser`；请勿混淆。
+模块自身包名为 `dev.quark.kill`，目标夸克包名为 `com.quark.browser`；请勿混淆。
 
 ## 常见问题
 
