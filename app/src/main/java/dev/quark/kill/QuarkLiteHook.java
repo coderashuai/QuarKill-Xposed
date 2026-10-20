@@ -618,7 +618,7 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
                     for (long retry : new long[]{700L, 2200L, 4500L}) {
                         root.postDelayed(() -> {
                             if (a.isFinishing() || a.isDestroyed()) return;
-                            FLAGS.clear();
+                            flagsReadAt = 0L;
                             pruneUi(root, root.getHeight(), 0);
                             hideNovelInMenu(root, 0);
                         }, retry);
