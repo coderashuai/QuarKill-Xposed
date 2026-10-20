@@ -1,10 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <queries><provider android:authorities="dev.quarklite.config" /></queries>
+    <queries><provider android:authorities="dev.quark.kill.config" /></queries>
     <application android:label="Quark Kill" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="false">
         <activity android:name=".SettingsActivity" android:exported="true" android:label="Quark Kill">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>
-        <provider android:name=".LiteConfigProvider" android:authorities="dev.quarklite.config" android:exported="true" />
+        <provider android:name=".LiteConfigProvider" android:authorities="dev.quark.kill.config" android:exported="true" />
         <meta-data android:name="xposedmodule" android:value="true" />
         <meta-data android:name="xposeddescription" android:value="夸克浏览器精简插件" />
         <meta-data android:name="xposedminversion" android:value="82" />
