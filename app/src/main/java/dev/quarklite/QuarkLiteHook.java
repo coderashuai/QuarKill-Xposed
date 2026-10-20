@@ -69,14 +69,33 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
                     XposedHelpers.callMethod(thread, "getSystemContext");
             } catch (Throwable ignored) {}
         }
+        // Persist a mirror inside Quark's own private storage. A force-stopped
+        // module app cannot serve ContentProvider requests until explicitly launched.
+        // The last successfully fetched values must survive Quark process death.
+        android.content.SharedPreferences mirror = null;
+        if (context != null && TARGET.equals(context.getPackageName())) {
+            try {
+                mirror = context.getSharedPreferences("quarkkill_cached_flags", 0);
+            } catch (Throwable t) {
+                if (CONFIG_FAILURES.getAndIncrement() < 3)
+                    XposedBridge.log("QuarkKill config mirror error: " + t);
+            }
+        }
         Boolean value = LiteConfigProvider.readNullable(context, key);
         if (value != null) {
             FLAGS.put(key, value);
             LAST_GOOD_FLAGS.put(key, value);
+            if (mirror != null) mirror.edit().putBoolean(key, value).apply();
             return value;
         }
+        if (mirror != null && mirror.contains(key)) {
+            boolean saved = mirror.getBoolean(key, false);
+            FLAGS.put(key, saved);
+            LAST_GOOD_FLAGS.put(key, saved);
+            return saved;
+        }
         if (CONFIG_FAILURES.incrementAndGet() <= 3)
-            XposedBridge.log("QuarkKill config read failed: " + key + " (provider unavailable)");
+            XposedBridge.log("QuarkKill config read failed: " + key + " (no persistent mirror yet)");
         Boolean previous = LAST_GOOD_FLAGS.get(key);
         return previous != null && previous;
     }
@@ -84,7 +103,7 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
         // LSPosed logs only actual failures/errors, not routine hook or block events.
         if ((s.contains("failed") || s.contains("error") || s.contains("unavailable")) &&
             LOGS.incrementAndGet() <= 40)
-            XposedBridge.log("QuarkKill/2.4.0 " + s);
+            XposedBridge.log("QuarkKill/2.4.1 " + s);
     }
 
     @Override public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
