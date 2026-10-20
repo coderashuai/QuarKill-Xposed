@@ -6,7 +6,7 @@
         </activity>
         <provider android:name=".LiteConfigProvider" android:authorities="dev.quarklite.config" android:exported="true" />
         <meta-data android:name="xposedmodule" android:value="true" />
-        <meta-data android:name="xposeddescription" android:value="Quark 10.19 UI cleanup (experimental, scoped)" />
+        <meta-data android:name="xposeddescription" android:value="夸克浏览器精简插件" />
         <meta-data android:name="xposedminversion" android:value="82" />
     </application>
 </manifest>
