@@ -31,7 +31,7 @@ public final class SettingsActivity extends Activity {
    for(int j=1;j<section.length;j++){
     String key=section[j];int idx=index(key);if(idx<0)continue;
     LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(10),dp(8),dp(6),dp(8));row.setBackgroundColor(Color.WHITE);
-    TextView name=new TextView(this);name.setText("plus".equals(key)?"隐藏搜索框小插件（同时隐藏语音和相机）":("swipe".equals(key)?"禁止左滑进入 AI（同时隐藏模式指示点）":("cloud".equals(key)?"隐藏首页底栏网盘按钮":("dns".equals(key)?"禁止检测和谐网址(手动狗头)":("webads".equals(key)?"实验性网页请求过滤":names[idx])))));name.setTextSize(14);name.setTextColor(Color.rgb(34,40,52));
+    TextView name=new TextView(this);name.setText("plus".equals(key)?"隐藏搜索框小插件（同时隐藏语音和相机）":("swipe".equals(key)?"禁止左滑进入 AI（同时隐藏模式指示点）":("cloud".equals(key)?"隐藏首页底栏网盘按钮":("dns".equals(key)?"禁止检测和谐网址(待实现)":("webads".equals(key)?"实验性网页请求过滤":names[idx])))));name.setTextSize(14);name.setTextColor(Color.rgb(34,40,52));
     row.addView(name,new LinearLayout.LayoutParams(0,dp(48),1));
     Switch toggle=new Switch(this);
     toggle.setChecked(getSharedPreferences("flags",0).getBoolean(key,false));
