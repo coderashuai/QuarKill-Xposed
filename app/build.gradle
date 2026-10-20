@@ -1,8 +1,8 @@
 plugins { id 'com.android.application' }
 android {
-    namespace 'dev.quarklite'
+    namespace 'dev.quark.kill'
     compileSdk 35
-    defaultConfig { applicationId 'dev.quarklite'; minSdk 26; targetSdk 28; versionCode 1; versionName '1.0' }
+    defaultConfig { applicationId 'dev.quark.kill'; minSdk 26; targetSdk 28; versionCode 1; versionName '1.0' }
     // LSPosed module distributed outside Google Play; preserve target SDK compatibility.
     lint { disable 'ExpiredTargetSdkVersion' }
     buildTypes { release { minifyEnabled false } }
