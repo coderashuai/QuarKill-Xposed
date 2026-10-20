@@ -18,13 +18,21 @@ public final class LiteConfigProvider extends ContentProvider {
  }
  @Override public boolean onCreate(){return true;}
  @Override public Cursor query(Uri uri,String[] projection,String selection,String[] args,String sort){
-  if(!"/flags".equals(uri.getPath())||projection==null||projection.length!=1)return null;
-  String key=projection[0];int idx=-1;
-  for(int i=0;i<KEYS.length;i++)if(KEYS[i].equals(key)){idx=i;break;}
-  if(idx<0)return null;
-  MatrixCursor cursor=new MatrixCursor(new String[]{key});
-  boolean value=getContext().getSharedPreferences("flags",Context.MODE_PRIVATE).getBoolean(key,DEFAULTS[idx]);
-  cursor.addRow(new Object[]{value?1:0});return cursor;
+  if(!"/flags".equals(uri.getPath())||projection==null||projection.length==0)return null;
+  for(String key:projection){
+   boolean known=false;
+   for(String allowed:KEYS)if(allowed.equals(key)){known=true;break;}
+   if(!known)return null;
+  }
+  MatrixCursor cursor=new MatrixCursor(projection);
+  Object[] row=new Object[projection.length];
+  android.content.SharedPreferences prefs=getContext().getSharedPreferences("flags",Context.MODE_PRIVATE);
+  for(int i=0;i<projection.length;i++){
+   int idx=0;
+   for(int j=0;j<KEYS.length;j++)if(KEYS[j].equals(projection[i])){idx=j;break;}
+   row[i]=prefs.getBoolean(projection[i],DEFAULTS[idx])?1:0;
+  }
+  cursor.addRow(row);return cursor;
  }
  @Override public String getType(Uri uri){return "vnd.android.cursor.item/vnd.quarklite.flag";}
  @Override public Uri insert(Uri u,ContentValues v){throw new UnsupportedOperationException();}
