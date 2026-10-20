@@ -44,18 +44,24 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
     private static final java.util.concurrent.ConcurrentHashMap<String, Boolean> LAST_GOOD_FLAGS = new java.util.concurrent.ConcurrentHashMap<>();
     private static volatile long flagsReadAt;
     private static final AtomicInteger CONFIG_FAILURES = new AtomicInteger();
+    private static final long CONFIG_REFRESH_MS = 5000L;
     private static boolean flag(String key) {
         long now = android.os.SystemClock.elapsedRealtime();
-        if (now - flagsReadAt > 2000L) {
+        if (flagsReadAt == 0 || now - flagsReadAt >= CONFIG_REFRESH_MS) {
             synchronized (FLAGS) {
-                if (now - flagsReadAt > 2000L) {
-                    FLAGS.clear();
+                now = android.os.SystemClock.elapsedRealtime();
+                if (flagsReadAt == 0 || now - flagsReadAt >= CONFIG_REFRESH_MS) {
+                    refreshFlags();
                     flagsReadAt = now;
                 }
             }
         }
-        Boolean cached = FLAGS.get(key);
-        if (cached != null) return cached;
+        Boolean value = FLAGS.get(key);
+        if (value != null) return value;
+        Boolean previous = LAST_GOOD_FLAGS.get(key);
+        return previous != null && previous;
+    }
+    private static void refreshFlags() {
         android.content.Context context = null;
         try {
             context = (android.content.Context) XposedHelpers.callStaticMethod(
@@ -69,9 +75,6 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
                     XposedHelpers.callMethod(thread, "getSystemContext");
             } catch (Throwable ignored) {}
         }
-        // Persist a mirror inside Quark's own private storage. A force-stopped
-        // module app cannot serve ContentProvider requests until explicitly launched.
-        // The last successfully fetched values must survive Quark process death.
         android.content.SharedPreferences mirror = null;
         if (context != null && TARGET.equals(context.getPackageName())) {
             try {
@@ -81,23 +84,42 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
                     XposedBridge.log("QuarkKill config mirror error: " + t);
             }
         }
-        Boolean value = LiteConfigProvider.readNullable(context, key);
-        if (value != null) {
-            FLAGS.put(key, value);
-            LAST_GOOD_FLAGS.put(key, value);
-            if (mirror != null) mirror.edit().putBoolean(key, value).apply();
-            return value;
+        boolean fetched = false;
+        if (context != null) {
+            try (android.database.Cursor cursor = context.getContentResolver().query(
+                    android.net.Uri.parse("content://" + LiteConfigProvider.AUTH + "/flags"),
+                    LiteConfigProvider.KEYS, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst() &&
+                        cursor.getColumnCount() == LiteConfigProvider.KEYS.length) {
+                    android.content.SharedPreferences.Editor editor = null;
+                    for (int i = 0; i < LiteConfigProvider.KEYS.length; i++) {
+                        String key = LiteConfigProvider.KEYS[i];
+                        boolean value = cursor.getInt(i) != 0;
+                        FLAGS.put(key, value);
+                        LAST_GOOD_FLAGS.put(key, value);
+                        if (mirror != null && (!mirror.contains(key) ||
+                                mirror.getBoolean(key, false) != value)) {
+                            if (editor == null) editor = mirror.edit();
+                            editor.putBoolean(key, value);
+                        }
+                    }
+                    if (editor != null) editor.apply();
+                    fetched = true;
+                }
+            } catch (Throwable t) {
+                if (CONFIG_FAILURES.incrementAndGet() <= 3)
+                    XposedBridge.log("QuarkKill config batch read failed: " + t);
+            }
         }
-        if (mirror != null && mirror.contains(key)) {
-            boolean saved = mirror.getBoolean(key, false);
-            FLAGS.put(key, saved);
-            LAST_GOOD_FLAGS.put(key, saved);
-            return saved;
+        if (!fetched) {
+            for (String key : LiteConfigProvider.KEYS) {
+                Boolean saved = null;
+                if (mirror != null && mirror.contains(key))
+                    saved = mirror.getBoolean(key, false);
+                if (saved == null) saved = LAST_GOOD_FLAGS.get(key);
+                if (saved != null) FLAGS.put(key, saved);
+            }
         }
-        if (CONFIG_FAILURES.incrementAndGet() <= 3)
-            XposedBridge.log("QuarkKill config read failed: " + key + " (no persistent mirror yet)");
-        Boolean previous = LAST_GOOD_FLAGS.get(key);
-        return previous != null && previous;
     }
     private static void log(String s) {
         // LSPosed logs only actual failures/errors, not routine hook or block events.
@@ -131,8 +153,8 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
                     android.app.Application app = (android.app.Application) param.thisObject;
                     if (!TARGET.equals(app.getPackageName())) return;
                     new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                        FLAGS.clear();
-                        for (String key : LiteConfigProvider.KEYS) flag(key);
+                        flagsReadAt = 0L;
+                        flag(LiteConfigProvider.KEYS[0]);
                     }, 400L);
                 }
             });
