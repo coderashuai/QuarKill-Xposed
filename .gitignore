@@ -1,0 +1,12 @@
+# Android / Gradle 编译产物
+.gradle/
+gradle/
+build/
+**/build/
+
+# Android Studio 本地配置
+.idea/
+*.iml
+
+# 本地 SDK 路径
+local.properties
