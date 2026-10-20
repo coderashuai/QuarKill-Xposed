@@ -43,6 +43,7 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
     private static final java.util.concurrent.ConcurrentHashMap<String, Boolean> FLAGS = new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.concurrent.ConcurrentHashMap<String, Boolean> LAST_GOOD_FLAGS = new java.util.concurrent.ConcurrentHashMap<>();
     private static volatile long flagsReadAt;
+    private static final AtomicInteger CONFIG_FAILURES = new AtomicInteger();
     private static boolean flag(String key) {
         long now = android.os.SystemClock.elapsedRealtime();
         if (now - flagsReadAt > 2000L) {
@@ -74,21 +75,21 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
             LAST_GOOD_FLAGS.put(key, value);
             return value;
         }
+        if (CONFIG_FAILURES.incrementAndGet() <= 3)
+            XposedBridge.log("QuarkKill config read failed: " + key + " (provider unavailable)");
         Boolean previous = LAST_GOOD_FLAGS.get(key);
         return previous != null && previous;
     }
     private static void log(String s) {
-        // Production logging: errors only. Avoid startup log I/O and repeated
-        // diagnostic formatting on the UI thread.
-        if ((s.contains("failed") || s.contains("error") || s.contains("unavailable") ||
-            (flag("diagnostic") && s.startsWith("blocked "))) &&
+        // LSPosed logs only actual failures/errors, not routine hook or block events.
+        if ((s.contains("failed") || s.contains("error") || s.contains("unavailable")) &&
             LOGS.incrementAndGet() <= 40)
-            XposedBridge.log("QuarkLite/2.3.9 " + s);
+            XposedBridge.log("QuarkKill/2.4.0 " + s);
     }
 
     @Override public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
         if (!TARGET.equals(lp.packageName) || !TARGET.equals(lp.processName)) return;
-        log("injected " + lp.processName);
+        // Successful injection is intentionally silent.
         hookToolbar(lp.classLoader);
         hookHome(lp.classLoader);
         hookActivityUi(lp.classLoader);
@@ -97,6 +98,25 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
         hookNetwork();
         hookMenuDialog();
         hookQuickMenuWindows();
+        installConfigRecovery();
+    }
+
+    // Re-read settings after application initialization. Cold-start reads can fail
+    // before ActivityThread has an Application; existing UI is then reprocessed.
+    private static void installConfigRecovery() {
+        try {
+            XposedHelpers.findAndHookMethod(android.app.Application.class, "onCreate", new XC_MethodHook() {
+                @Override protected void afterHookedMethod(MethodHookParam param) {
+                    if (!(param.thisObject instanceof android.app.Application)) return;
+                    android.app.Application app = (android.app.Application) param.thisObject;
+                    if (!TARGET.equals(app.getPackageName())) return;
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        FLAGS.clear();
+                        for (String key : LiteConfigProvider.KEYS) flag(key);
+                    }, 400L);
+                }
+            });
+        } catch (Throwable t) { log("config recovery hook failed " + t); }
     }
 
     private static void hookToolbar(ClassLoader cl) {
@@ -455,6 +475,15 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
                     Activity a = (Activity) p.thisObject;
                     View root = a.getWindow().getDecorView();
                     installMenuGuard(root);
+                    // Refresh settings and re-apply filters after cold-start IPC races.
+                    for (long retry : new long[]{700L, 2200L, 4500L}) {
+                        root.postDelayed(() -> {
+                            if (a.isFinishing() || a.isDestroyed()) return;
+                            FLAGS.clear();
+                            pruneUi(root, root.getHeight(), 0);
+                            hideNovelInMenu(root, 0);
+                        }, retry);
+                    }
                     for (long delay : new long[]{450L, 1700L}) {
                         root.postDelayed(() -> {
                             try {
