@@ -3,6 +3,7 @@ import android.content.*;
 import android.database.*;
 import android.net.Uri;
 public final class LiteConfigProvider extends ContentProvider {
+ private static final java.util.concurrent.atomic.AtomicInteger ERRORS=new java.util.concurrent.atomic.AtomicInteger();
  public static final String AUTH="dev.quarklite.config";
  public static final String[] KEYS={"plus","voice","camera","ai","swipe","dots","resultvoice","novel","cloud","shortcuts","dns","webads","splash","shake","upsell","update","diagnostic"};
  public static final boolean[] DEFAULTS={false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false};
@@ -10,7 +11,9 @@ public final class LiteConfigProvider extends ContentProvider {
   if(context==null)return null;
   try(Cursor c=context.getContentResolver().query(Uri.parse("content://"+AUTH+"/flags"),new String[]{key},null,null,null)){
    if(c!=null&&c.moveToFirst())return c.getInt(0)!=0;
-  }catch(Throwable ignored){}
+  }catch(Throwable t){
+   if(ERRORS.getAndIncrement()<3)android.util.Log.e("QuarkKill","Configuration provider query failed",t);
+  }
   return null;
  }
  @Override public boolean onCreate(){return true;}
