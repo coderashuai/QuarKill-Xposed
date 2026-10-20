@@ -6,11 +6,12 @@ public final class LiteConfigProvider extends ContentProvider {
  public static final String AUTH="dev.quarklite.config";
  public static final String[] KEYS={"plus","voice","camera","ai","swipe","dots","resultvoice","novel","cloud","shortcuts","dns","webads","splash","shake","upsell","update","diagnostic"};
  public static final boolean[] DEFAULTS={false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false};
- public static boolean read(Context context,String key,boolean fallback){
+ public static Boolean readNullable(Context context,String key){
+  if(context==null)return null;
   try(Cursor c=context.getContentResolver().query(Uri.parse("content://"+AUTH+"/flags"),new String[]{key},null,null,null)){
    if(c!=null&&c.moveToFirst())return c.getInt(0)!=0;
   }catch(Throwable ignored){}
-  return fallback;
+  return null;
  }
  @Override public boolean onCreate(){return true;}
  @Override public Cursor query(Uri uri,String[] projection,String selection,String[] args,String sort){
