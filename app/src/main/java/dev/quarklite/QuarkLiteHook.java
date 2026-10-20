@@ -112,6 +112,7 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
         hookToolbar(lp.classLoader);
         hookHome(lp.classLoader);
         hookActivityUi(lp.classLoader);
+        hookSettingsEntry(lp.classLoader);
         hookHomeAttach(lp.classLoader);
         hookSearchBox(lp.classLoader);
         hookNetwork();
@@ -483,6 +484,103 @@ public final class QuarkLiteHook implements IXposedHookLoadPackage {
                 }
             });
         } catch (Throwable t) { log("homepage attach hook failed " + t); }
+    }
+
+    // Inject a single shortcut into Quark's native settings list, not the home page.
+    private static final java.util.WeakHashMap<Activity, Boolean> SETTINGS_WATCHERS =
+        new java.util.WeakHashMap<>();
+    private static final int SETTINGS_ENTRY_ID = 0x5a711e;
+    private static void hookSettingsEntry(ClassLoader cl) {
+        try {
+            Class<?> main = XposedHelpers.findClass("com.ucpro.MainActivity", cl);
+            XposedBridge.hookAllMethods(main, "onResume", new XC_MethodHook() {
+                @Override protected void afterHookedMethod(MethodHookParam p) {
+                    if (!(p.thisObject instanceof Activity)) return;
+                    Activity activity = (Activity) p.thisObject;
+                    View decor = activity.getWindow().getDecorView();
+                    if (SETTINGS_WATCHERS.containsKey(activity)) return;
+                    SETTINGS_WATCHERS.put(activity, true);
+                    final long[] lastScan = {0L};
+                    ViewTreeObserver.OnGlobalLayoutListener listener = () -> {
+                        long now = android.os.SystemClock.uptimeMillis();
+                        if (now - lastScan[0] < 500L) return;
+                        lastScan[0] = now;
+                        if (!activity.isFinishing() && !activity.isDestroyed())
+                            insertSettingsShortcut(activity, decor);
+                    };
+                    decor.getViewTreeObserver().addOnGlobalLayoutListener(listener);
+                    decor.post(() -> insertSettingsShortcut(activity, decor));
+                }
+            });
+        } catch (Throwable t) { log("settings entry hook failed " + t); }
+    }
+
+    private static View findExactLabel(View node, String target, int depth) {
+        if (node == null || depth > 30 || node instanceof WebView) return null;
+        if (node instanceof TextView && target.contentEquals(((TextView) node).getText()))
+            return node;
+        if (node instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) node;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                View found = findExactLabel(group.getChildAt(i), target, depth + 1);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private static int settingsDp(Activity activity, float dp) {
+        return (int) (dp * activity.getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private static void insertSettingsShortcut(Activity activity, View decor) {
+        try {
+            // Both labels are required to avoid injecting into unrelated screens.
+            View account = findExactLabel(decor, "账号与安全", 0);
+            View browsing = findExactLabel(decor, "搜索与浏览", 0);
+            if (account == null || browsing == null || !account.isShown() || !browsing.isShown())
+                return;
+            ViewGroup parent = (ViewGroup) account.getParent();
+            // Climb to the direct settings-list item owned by a vertical LinearLayout.
+            while (parent != null && !(parent instanceof android.widget.LinearLayout
+                    && ((android.widget.LinearLayout) parent).getOrientation()
+                       == android.widget.LinearLayout.VERTICAL
+                    && parent.indexOfChild(account) >= 0)) {
+                if (!(parent.getParent() instanceof ViewGroup)) break;
+                account = parent;
+                parent = (ViewGroup) parent.getParent();
+            }
+            if (!(parent instanceof android.widget.LinearLayout)) return;
+            android.widget.LinearLayout list = (android.widget.LinearLayout) parent;
+            int position = list.indexOfChild(account);
+            if (position < 0 || list.findViewById(SETTINGS_ENTRY_ID) != null) return;
+            // Only inject if the settings labels belong to the same section.
+            View check = browsing;
+            boolean sameSection = false;
+            while (check != null) {
+                if (check == list) { sameSection = true; break; }
+                if (!(check.getParent() instanceof View)) break;
+                check = (View) check.getParent();
+            }
+            if (!sameSection) return;
+            android.widget.TextView entry = new android.widget.TextView(activity);
+            entry.setId(SETTINGS_ENTRY_ID);
+            entry.setText("Quark Kill 精简设置   ›");
+            entry.setTextSize(16f);
+            entry.setTextColor(0xff252b36);
+            entry.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            entry.setPadding(settingsDp(activity, 20), 0, settingsDp(activity, 20), 0);
+            entry.setBackgroundResource(android.R.drawable.list_selector_background);
+            entry.setOnClickListener(v -> {
+                try {
+                    android.content.Intent intent = new android.content.Intent();
+                    intent.setClassName("dev.quarklite", "dev.quarklite.SettingsActivity");
+                    activity.startActivity(intent);
+                } catch (Throwable t) { log("settings entry launch failed " + t); }
+            });
+            list.addView(entry, position, new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, settingsDp(activity, 56)));
+        } catch (Throwable t) { log("settings entry insertion failed " + t); }
     }
 
     private static void hookActivityUi(ClassLoader cl) {
